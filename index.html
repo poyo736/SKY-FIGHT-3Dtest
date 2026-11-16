@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>SKY FIGHT | ダイ 3Dテスト</title>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>SKY FIGHT | STEP 39 ダイの3Dモーション</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#070c1d;color:#f4f7ff;font-family:system-ui,"Noto Sans JP",sans-serif;overflow:hidden}canvas{display:block}#ui{position:fixed;top:0;left:0;right:0;padding:16px;pointer-events:none;background:linear-gradient(#080e24df,transparent)}h1{font-size:clamp(18px,3vw,27px);margin:0;letter-spacing:.08em}small{color:#a9c5f4}#status{margin-top:8px;font-size:13px;color:#b4d4ff}#controls{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:8px;width:min(95vw,700px)}button{border:1px solid #7297db;border-radius:12px;background:#17284d;color:white;font-weight:700;padding:12px 15px;cursor:pointer;touch-action:manipulation}button:active{background:#3265aa}#note{position:fixed;right:12px;top:15px;color:#a9c5f4;font-size:12px;text-align:right}#error{position:fixed;top:42%;left:10%;right:10%;text-align:center;color:#ffb6b6;font-weight:700;white-space:pre-wrap;pointer-events:none} @media(max-width:620px){#note{top:85px}#controls button{padding:12px 10px}}
+*{box-sizing:border-box}body{margin:0;background:#070c1d;color:#f4f7ff;font-family:system-ui,"Noto Sans JP",sans-serif;overflow:hidden}canvas{display:block}#ui{position:fixed;top:0;left:0;right:0;padding:16px;pointer-events:none;background:linear-gradient(#080e24df,transparent)}h1{font-size:clamp(18px,3vw,27px);margin:0;letter-spacing:.08em}small{color:#a9c5f4}#status{margin-top:8px;font-size:13px;color:#b4d4ff}#controls{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:8px;width:min(95vw,700px)}button{border:1px solid #7297db;border-radius:12px;background:#17284d;color:white;font-weight:700;padding:12px 15px;cursor:pointer;touch-action:manipulation}button:active{background:#3265aa}#note{position:fixed;right:12px;top:15px;color:#a9c5f4;font-size:12px;text-align:right}#error{position:fixed;top:42%;left:10%;right:10%;text-align:center;color:#ffb6b6;font-weight:700;white-space:pre-wrap;pointer-events:none} #motionHelp{position:fixed;left:16px;top:95px;color:#c5dcff;font-size:13px;line-height:1.7;pointer-events:none}#controls button.active{background:#3265aa;border-color:#b6dbff} @media(max-width:620px){#note{top:85px}#controls button{padding:12px 10px}}
 </style>
 <script type="importmap">{"imports":{"three":"https://esm.sh/three@0.170.0","three/addons/":"https://esm.sh/three@0.170.0/examples/jsm/","@pixiv/three-vrm":"https://esm.sh/@pixiv/three-vrm@3.2.0?external=three"}}</script></head>
-<body><div id="ui"><h1>SKY FIGHT <span style="color:#71b8ff">2.5D LAB</span></h1><small>DAI / 3D MODEL TEST</small><div id="status">モデルを読み込み中…</div></div><div id="note">ドラッグ：回転　ホイール：ズーム<br>※初回はインターネット接続が必要</div><div id="error"></div><div id="controls"><button id="front">正面</button><button id="side">横向き</button><button id="back">背面</button><button id="reset">リセット</button><button id="spin">自動回転 OFF</button></div>
+<body><div id="ui"><h1>SKY FIGHT <span style="color:#71b8ff">2.5D LAB</span></h1><small>DAI / STEP 39 — IDLE · WALK · PUNCH</small><div id="status">モデルを読み込み中…</div></div><div id="note">ドラッグ：回転　ホイール：ズーム<br>※初回はインターネット接続が必要</div><div id="error"></div><div id="motionHelp">A / D または ← / →：歩く<br>J：パンチ　W / Space：ジャンプ<br>スマホは下のボタンで操作</div><div id="controls"><button id="moveLeft">◀ 移動</button><button id="moveRight">移動 ▶</button><button id="punch">👊 パンチ J</button><button id="jump">↑ ジャンプ W</button><button id="front">正面</button><button id="side">横向き</button><button id="back">背面</button><button id="reset">リセット</button><button id="spin">自動回転 OFF</button></div>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -19,6 +19,54 @@ scene.add(new THREE.HemisphereLight(0xc9e7ff,0x2d3659,2.3));const key=new THREE.
 const floor=new THREE.Mesh(new THREE.CircleGeometry(6,64),new THREE.MeshStandardMaterial({color:0x14264d,roughness:.85}));floor.rotation.x=-Math.PI/2;floor.position.y=-.02;scene.add(floor);
 const grid=new THREE.GridHelper(12,24,0x3468b5,0x203b6e);grid.position.y=.002;scene.add(grid);
 let model=null,autoSpin=false;const clock=new THREE.Clock();
+const pressed=new Set();let elapsed=0,walkTime=0,punchTime=0,jumpY=0,jumpSpeed=0;
+const bones={};const boneNames=['hips','spine','chest','upperChest','neck','head','leftUpperArm','rightUpperArm','leftLowerArm','rightLowerArm','leftUpperLeg','rightUpperLeg','leftLowerLeg','rightLowerLeg'];
+const rest={};const duration=.36;let posX=0;
+function registerBones(){
+ for(const name of boneNames){const node=model.humanoid?.getNormalizedBoneNode(name);if(node){bones[name]=node;rest[name]=node.quaternion.clone();}}
+}
+function poseBone(name,x=0,y=0,z=0){
+ const node=bones[name];if(!node)return;
+ const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(x,y,z,'XYZ'));
+ node.quaternion.copy(rest[name]).multiply(q);
+}
+function triggerPunch(){if(!model)return;punchTime=duration;}
+function triggerJump(){if(!model||jumpY>0.005)return;jumpSpeed=4.5;}
+function holdButton(id,key){const el=document.getElementById(id);const down=e=>{e.preventDefault();pressed.add(key);el.classList.add('active');};const up=e=>{e.preventDefault();pressed.delete(key);el.classList.remove('active');};el.addEventListener('pointerdown',down);for(const ev of ['pointerup','pointercancel','pointerleave'])el.addEventListener(ev,up);}
+holdButton('moveLeft','a');holdButton('moveRight','d');
+document.getElementById('punch').addEventListener('pointerdown',e=>{e.preventDefault();triggerPunch();});
+document.getElementById('jump').addEventListener('pointerdown',e=>{e.preventDefault();triggerJump();});
+addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(['a','d','w','j','arrowleft','arrowright',' '].includes(k))e.preventDefault();pressed.add(k);if(!e.repeat&&k==='j')triggerPunch();if(!e.repeat&&(k==='w'||k===' '))triggerJump();});
+addEventListener('keyup',e=>pressed.delete(e.key.toLowerCase()));
+addEventListener('blur',()=>pressed.clear());
+function updateMotion(dt){
+ elapsed+=dt;
+ const move=(pressed.has('d')||pressed.has('arrowright')?1:0)-(pressed.has('a')||pressed.has('arrowleft')?1:0);
+ if(move){posX=THREE.MathUtils.clamp(posX+move*dt*1.35,-2.5,2.5);walkTime+=dt*9;}
+ const walking=move!==0&&jumpY<.01;
+ const swing=walking?Math.sin(walkTime)*.48:0;
+ const breathe=Math.sin(elapsed*2.3);
+ punchTime=Math.max(0,punchTime-dt);
+ const punchProgress=punchTime>0?1-punchTime/duration:0;
+ const punchWeight=punchTime>0?Math.sin(Math.PI*punchProgress)**.65:0;
+ // VRM正規化ボーンのローカル回転に加算する簡易アニメーション
+ poseBone('hips',0,0,walking?Math.sin(walkTime)*.045:0);
+ poseBone('spine',breathe*.012,0,-punchWeight*.12);
+ poseBone('chest',breathe*.012,punchWeight*.22,0);
+ poseBone('leftUpperArm',-.12+swing*.65,0,-.16);
+ poseBone('rightUpperArm',-.12-swing*.65-punchWeight*1.22,0,.16);
+ poseBone('leftLowerArm',-.18,0,-.05);
+ poseBone('rightLowerArm',-.18+punchWeight*.10,0,0);
+ poseBone('leftUpperLeg',-swing,0,0);poseBone('rightUpperLeg',swing,0,0);
+ poseBone('leftLowerLeg',walking?Math.max(0,-swing)*.55:0,0,0);
+ poseBone('rightLowerLeg',walking?Math.max(0,swing)*.55:0,0,0);
+ if(jumpSpeed||jumpY){jumpSpeed-=dt*11.5;jumpY=Math.max(0,jumpY+jumpSpeed*dt);if(jumpY===0)jumpSpeed=0;}
+ model.scene.position.x=posX;
+ model.scene.position.y=baseY+jumpY+(walking?Math.abs(Math.sin(walkTime))*.025:breathe*.009);
+ if(move&&!autoSpin)model.scene.rotation.y=move>0?-.15:.15;
+ status.textContent=jumpY>0?'ジャンプ中！':punchTime>0?'パンチ！':walking?'歩行中':'ダイの3Dモーション準備OK！';
+}
+let baseY=0;
 const loader=new GLTFLoader();loader.register(parser=>new VRMLoaderPlugin(parser));
 loader.load('./dai.vrm',gltf=>{
  model=gltf.userData.vrm;
@@ -30,12 +78,12 @@ loader.load('./dai.vrm',gltf=>{
  // 地面に足を揃え、左右を中央へ
  model.scene.position.x-=center.x;model.scene.position.y-=bounds.min.y;model.scene.position.z-=center.z;
  const height=Math.max(size.y,1);orbit.target.set(0,height*.53,0);camera.position.set(0,height*.57,Math.max(height*2.0,3.6));orbit.update();
- status.textContent=`読み込み成功！ ダイの3Dモデル表示中（身長スケール ${size.y.toFixed(2)}）`;
+ registerBones();baseY=model.scene.position.y;status.textContent=`読み込み成功！ ダイの3Dモデル（身長スケール ${size.y.toFixed(2)}）`;
 },xhr=>{if(xhr.total)status.textContent=`読み込み中… ${Math.round(xhr.loaded/xhr.total*100)}%`;},err=>{
  console.error(err);status.textContent='読み込みに失敗しました';error.textContent='モデルを読み込めませんでした。\nローカルサーバーまたはGitHub Pagesから開いてください。\n（ファイルを直接ダブルクリックすると読み込めない場合があります）';
 });
 function face(angle){if(!model)return;model.scene.rotation.y=angle;}
-document.getElementById('front').onclick=()=>face(0);document.getElementById('side').onclick=()=>face(Math.PI/2);document.getElementById('back').onclick=()=>face(Math.PI);document.getElementById('reset').onclick=()=>{face(0);autoSpin=false;document.getElementById('spin').textContent='自動回転 OFF';orbit.reset();};document.getElementById('spin').onclick=()=>{autoSpin=!autoSpin;document.getElementById('spin').textContent=autoSpin?'自動回転 ON':'自動回転 OFF'};
-function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);if(model){model.update(dt);if(autoSpin)model.scene.rotation.y+=dt*.65;}orbit.update();renderer.render(scene,camera)}animate();
+document.getElementById('front').onclick=()=>face(0);document.getElementById('side').onclick=()=>face(Math.PI/2);document.getElementById('back').onclick=()=>face(Math.PI);document.getElementById('reset').onclick=()=>{posX=0;jumpY=0;jumpSpeed=0;punchTime=0;face(0);autoSpin=false;document.getElementById('spin').textContent='自動回転 OFF';orbit.reset();};document.getElementById('spin').onclick=()=>{autoSpin=!autoSpin;document.getElementById('spin').textContent=autoSpin?'自動回転 ON':'自動回転 OFF'};
+function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);if(model){updateMotion(dt);model.update(dt);if(autoSpin)model.scene.rotation.y+=dt*.65;}orbit.update();renderer.render(scene,camera)}animate();
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 </script></body></html>
